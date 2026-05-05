@@ -1,6 +1,6 @@
 Flask==3.0.3
 opencv-python-headless==4.9.0.80
-ultralytics==8.2.28
+ultralytics
 mediapipe==0.10.14
 numpy==1.26.4
 torch==2.4.1
