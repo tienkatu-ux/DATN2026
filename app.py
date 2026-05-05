@@ -11,8 +11,8 @@ app = Flask(__name__)
 
 # --- KHỞI TẠO AI (Dùng đường dẫn tương đối để lên Cloud không bị lỗi) ---
 print("Đang nạp bộ não AI...")
-yolo_model = YOLO(r'D:\pbl5\k-neural-api\A_DATN\best.pt')
-base_options = python.BaseOptions(model_asset_path=r'D:\pbl5\k-neural-api\A_DATN\hand1_landmarker.task')
+yolo_model = YOLO('best.pt') 
+base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
 options = vision.HandLandmarkerOptions(
     base_options=base_options, num_hands=1,
     min_hand_detection_confidence=0.5, min_tracking_confidence=0.5)
