@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Nhận diện Ngôn ngữ Ký hiệu</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f0f2f5; margin: 0; padding: 20px;}
+        h1 { color: #1a73e8; }
+        .container { display: flex; flex-direction: column; align-items: center; }
+        .video-box { padding: 10px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        #canvas { border-radius: 8px; max-width: 100%; } /* Canvas hiển thị video AI */
+        .result-box { background: white; width: 640px; max-width: 90%; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .text-output { font-size: 28px; font-weight: bold; color: #333; min-height: 40px; margin-top: 10px; border: 2px dashed #ccc; padding: 10px;}
+        button { background-color: #ff4757; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: 0.3s; }
+        button:hover { background-color: #ff6b81; }
+    </style>
+</head>
+<body>
+
+    <h1>🧠 Web AI Dịch Ngôn ngữ Ký hiệu</h1>
+
+    <div class="container">
+        <div class="video-box">
+            <!-- Video ẩn dùng để mượn quyền Camera -->
+            <video id="video" width="640" height="480" autoplay playsinline style="display:none;"></video>
+
+            <!-- Đây là màn hình hiển thị ảnh AI trả về -->
+            <canvas id="canvas" width="640" height="480"></canvas>
+        </div>
+
+        <div class="result-box">
+            <h3>Ký tự hiện tại: <span id="current_char" style="color: #1a73e8;">-</span></h3>
+            <div class="text-output" id="output_text"></div>
+            <button onclick="clearText()">🗑️ Xóa dòng chữ</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const outputText = document.getElementById('output_text');
+        const currentChar = document.getElementById('current_char');
+
+        // 1. Mở camera của trình duyệt
+        navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { alert("Vui lòng cấp quyền mở Camera để hệ thống hoạt động!"); });
+
+        // 2. Vòng lặp bắn ảnh liên tục lên Python (120ms = Khoảng 8 FPS, đủ mượt cho Web Cloud)
+        setInterval(() => {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Vẽ video lấy được vào bộ nhớ tạm
+                let tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 640;
+                tempCanvas.height = 480;
+                tempCanvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
+
+                // Mã hóa ảnh (Nén 60% để gửi cho lẹ, chống lag đường truyền)
+                let dataURL = tempCanvas.toDataURL('image/jpeg', 0.6);
+
+                // Ném ảnh lên URL '/process_frame' bằng HTTP POST
+                fetch('/process_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: dataURL })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Cập nhật video đã vẽ khung
+                    let img = new Image();
+                    img.onload = function() {
+                        context.clearRect(0, 0, canvas.width, canvas.height);
+                        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    };
+                    img.src = data.result_image;
+
+                    // Cập nhật phần chữ cái dịch được
+                    outputText.innerText = data.translated_text;
+                    currentChar.innerText = data.current_char || "-";
+                })
+                .catch(err => console.error("Đang chờ phản hồi...", err));
+            }
+        }, 120);
+
+        // Hàm xóa chữ khi bấm nút
+        function clearText() {
+            fetch('/clear_data').then(() => {
+                outputText.innerText = "";
+            });
+        }
+    </script>
+</body>
+</html>
+
+<!--<!DOCTYPE html>-->
+<!--<html lang="vi">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<!--    <title>Hệ thống Nhận diện Ngôn ngữ Ký hiệu AI</title>-->
+<!--    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">-->
+<!--    <style>-->
+<!--        :root {-->
+<!--            &#45;&#45;primary-color: #00ff88;-->
+<!--            &#45;&#45;bg-color: #0f172a;-->
+<!--            &#45;&#45;panel-bg: rgba(30, 41, 59, 0.7);-->
+<!--            &#45;&#45;text-main: #f8fafc;-->
+<!--            &#45;&#45;text-muted: #94a3b8;-->
+<!--        }-->
+
+<!--        * {-->
+<!--            margin: 0;-->
+<!--            padding: 0;-->
+<!--            box-sizing: border-box;-->
+<!--            font-family: 'Inter', sans-serif;-->
+<!--        }-->
+
+<!--        body {-->
+<!--            background-color: var(&#45;&#45;bg-color);-->
+<!--            background-image:-->
+<!--                radial-gradient(at 0% 0%, rgba(0, 255, 136, 0.15) 0px, transparent 50%),-->
+<!--                radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.15) 0px, transparent 50%);-->
+<!--            color: var(&#45;&#45;text-main);-->
+<!--            min-height: 100vh;-->
+<!--            display: flex;-->
+<!--            flex-direction: column;-->
+<!--        }-->
+
+<!--        /* Header Navbar */-->
+<!--        header {-->
+<!--            padding: 1.5rem 5%;-->
+<!--            display: flex;-->
+<!--            justify-content: space-between;-->
+<!--            align-items: center;-->
+<!--            border-bottom: 1px solid rgba(255,255,255,0.05);-->
+<!--            backdrop-filter: blur(10px);-->
+<!--        }-->
+
+<!--        .logo {-->
+<!--            font-size: 1.5rem;-->
+<!--            font-weight: 700;-->
+<!--            display: flex;-->
+<!--            align-items: center;-->
+<!--            gap: 10px;-->
+<!--        }-->
+
+<!--        .logo span {-->
+<!--            color: var(&#45;&#45;primary-color);-->
+<!--        }-->
+
+<!--        .status-badge {-->
+<!--            padding: 8px 16px;-->
+<!--            background: rgba(0, 255, 136, 0.1);-->
+<!--            color: var(&#45;&#45;primary-color);-->
+<!--            border: 1px solid var(&#45;&#45;primary-color);-->
+<!--            border-radius: 20px;-->
+<!--            font-size: 0.85rem;-->
+<!--            font-weight: 600;-->
+<!--            display: flex;-->
+<!--            align-items: center;-->
+<!--            gap: 8px;-->
+<!--        }-->
+
+<!--        .status-dot {-->
+<!--            width: 8px;-->
+<!--            height: 8px;-->
+<!--            background-color: var(&#45;&#45;primary-color);-->
+<!--            border-radius: 50%;-->
+<!--            box-shadow: 0 0 10px var(&#45;&#45;primary-color);-->
+<!--            animation: pulse 1.5s infinite;-->
+<!--        }-->
+
+<!--        /* Main Workspace Layout */-->
+<!--        main {-->
+<!--            flex: 1;-->
+<!--            padding: 2rem 5%;-->
+<!--            display: grid;-->
+<!--            grid-template-columns: 2fr 1fr;-->
+<!--            gap: 2rem;-->
+<!--            align-items: start;-->
+<!--        }-->
+
+<!--        .panel {-->
+<!--            background: var(&#45;&#45;panel-bg);-->
+<!--            border: 1px solid rgba(255, 255, 255, 0.1);-->
+<!--            backdrop-filter: blur(16px);-->
+<!--            border-radius: 24px;-->
+<!--            padding: 1.5rem;-->
+<!--            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);-->
+<!--            /* Chốt cứng kích thước, không cho phép phình to đẩy khung camera */-->
+<!--            min-width: 0;-->
+<!--        }-->
+
+<!--        /* Camera Section */-->
+<!--        .camera-section {-->
+<!--            display: flex;-->
+<!--            flex-direction: column;-->
+<!--            gap: 1rem;-->
+<!--        }-->
+
+<!--        .video-container {-->
+<!--            width: 100%;-->
+<!--            aspect-ratio: 16/9;-->
+<!--            background-color: #000;-->
+<!--            border-radius: 16px;-->
+<!--            overflow: hidden;-->
+<!--            position: relative;-->
+<!--            display: flex;-->
+<!--            justify-content: center;-->
+<!--            align-items: center;-->
+<!--            border: 2px dashed rgba(255,255,255,0.2);-->
+<!--        }-->
+
+<!--        .video-container img {-->
+<!--            width: 100%;-->
+<!--            height: 100%;-->
+<!--            object-fit: cover;-->
+<!--        }-->
+
+<!--        /* Result Section */-->
+<!--        .result-section {-->
+<!--            display: flex;-->
+<!--            flex-direction: column;-->
+<!--            gap: 1.5rem;-->
+<!--            height: 100%;-->
+<!--        }-->
+
+<!--        .result-box {-->
+<!--            background: rgba(0,0,0,0.3);-->
+<!--            border-radius: 16px;-->
+<!--            padding: 1.5rem;-->
+<!--            min-height: 150px;-->
+<!--            /* Khóa chiều cao và tạo thanh cuộn nếu quá dài */-->
+<!--            max-height: 250px;-->
+<!--            overflow-y: auto;-->
+<!--            border: 1px solid rgba(255,255,255,0.05);-->
+<!--        }-->
+
+<!--        .result-box h3 {-->
+<!--            color: var(&#45;&#45;text-muted);-->
+<!--            font-size: 0.9rem;-->
+<!--            text-transform: uppercase;-->
+<!--            letter-spacing: 1px;-->
+<!--            margin-bottom: 1rem;-->
+<!--        }-->
+
+<!--        .translated-text {-->
+<!--            font-size: 2rem;-->
+<!--            font-weight: 700;-->
+<!--            color: var(&#45;&#45;primary-color);-->
+<!--            line-height: 1.4;-->
+<!--            /* Bắt buộc chữ phải tự ngắt khúc xuống dòng */-->
+<!--            word-wrap: break-word;-->
+<!--            word-break: break-word;-->
+<!--            white-space: pre-wrap;-->
+<!--            /* Hiệu ứng chuyển đổi cỡ chữ mượt mà */-->
+<!--            transition: font-size 0.3s ease;-->
+<!--        }-->
+
+<!--        .controls {-->
+<!--            display: flex;-->
+<!--            gap: 1rem;-->
+<!--            margin-top: auto;-->
+<!--        }-->
+
+<!--        .btn {-->
+<!--            flex: 1;-->
+<!--            padding: 12px 24px;-->
+<!--            border-radius: 12px;-->
+<!--            border: none;-->
+<!--            font-weight: 600;-->
+<!--            font-size: 1rem;-->
+<!--            cursor: pointer;-->
+<!--            transition: all 0.3s ease;-->
+<!--        }-->
+
+<!--        .btn-primary {-->
+<!--            background: var(&#45;&#45;primary-color);-->
+<!--            color: #000;-->
+<!--            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);-->
+<!--        }-->
+
+<!--        .btn-primary:hover {-->
+<!--            transform: translateY(-2px);-->
+<!--            box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4);-->
+<!--        }-->
+
+<!--        .btn-danger {-->
+<!--            background: rgba(239, 68, 68, 0.1);-->
+<!--            color: #ef4444;-->
+<!--            border: 1px solid rgba(239, 68, 68, 0.3);-->
+<!--        }-->
+
+<!--        .btn-danger:hover {-->
+<!--            background: rgba(239, 68, 68, 0.2);-->
+<!--        }-->
+
+<!--        /* Animations */-->
+<!--        @keyframes pulse {-->
+<!--            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }-->
+<!--            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }-->
+<!--            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }-->
+<!--        }-->
+
+<!--        /* Responsive */-->
+<!--        @media (max-width: 968px) {-->
+<!--            main {-->
+<!--                grid-template-columns: 1fr;-->
+<!--            }-->
+<!--        }-->
+<!--    </style>-->
+<!--</head>-->
+<!--<body>-->
+
+<!--    <header>-->
+<!--        <div class="logo">-->
+<!--            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(&#45;&#45;primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">-->
+<!--                <path d="M2 12h4l3-9 5 18 3-9h5"/>-->
+<!--            </svg>-->
+<!--            ASL <span>Vision</span>-->
+<!--        </div>-->
+<!--        <div class="status-badge">-->
+<!--            <div class="status-dot"></div>-->
+<!--            Hệ thống Sẵn sàng-->
+<!--        </div>-->
+<!--    </header>-->
+
+<!--    <main>-->
+<!--        <section class="panel camera-section">-->
+<!--            <div class="video-container">-->
+<!--                <img src="{{ url_for('video_feed') }}" style="width: 100%; height: 100%; object-fit: cover;" alt="Camera Stream">-->
+<!--            </div>-->
+<!--            <p style="color: var(&#45;&#45;text-muted); font-size: 0.9rem; text-align: center;">-->
+<!--                Hãy đảm bảo bàn tay của bạn nằm gọn trong khung hình và đủ ánh sáng.-->
+<!--            </p>-->
+<!--        </section>-->
+
+<!--        <section class="panel result-section">-->
+<!--            <div class="result-box">-->
+<!--                <h3>Văn bản được dịch</h3>-->
+<!--                <div class="translated-text" id="outputText">_</div>-->
+<!--            </div>-->
+
+<!--            <div class="result-box" style="min-height: auto;">-->
+<!--                <h3>Ký tự hiện tại</h3>-->
+<!--                <div class="translated-text" id="currentChar" style="color: #fff; font-size: 3rem;">-</div>-->
+<!--            </div>-->
+
+<!--            <div class="controls">-->
+<!--                <button class="btn btn-primary">Bật Camera</button>-->
+<!--                <button class="btn btn-danger">Xóa Dữ liệu</button>-->
+<!--            </div>-->
+<!--        </section>-->
+<!--    </main>-->
+
+<!--    <script>-->
+<!--        function updateData() {-->
+<!--            fetch('/get_data')-->
+<!--                .then(response => response.json())-->
+<!--                .then(data => {-->
+<!--                    let outText = document.getElementById('outputText');-->
+<!--                    let textContent = data.translated_text || "_";-->
+
+<!--                    // 1. Cập nhật nội dung chữ-->
+<!--                    outText.innerText = textContent;-->
+
+<!--                    // 2. Logic tự động thu nhỏ cỡ chữ dựa vào độ dài-->
+<!--                    let len = textContent.length;-->
+<!--                    if (len > 60) {-->
+<!--                        outText.style.fontSize = "1.1rem"; // Chữ bé nhất khi > 60 ký tự-->
+<!--                    } else if (len > 30) {-->
+<!--                        outText.style.fontSize = "1.4rem"; // Chữ vừa-->
+<!--                    } else if (len > 15) {-->
+<!--                        outText.style.fontSize = "1.7rem"; // Chữ hơi to-->
+<!--                    } else {-->
+<!--                        outText.style.fontSize = "2rem";   // Chữ to mặc định khi mới dịch-->
+<!--                    }-->
+
+<!--                    // 3. Cập nhật ký tự hiện tại-->
+<!--                    document.getElementById('currentChar').innerText = data.current_char || "-";-->
+<!--                })-->
+<!--                .catch(err => console.log("Đang chờ kết nối Backend...")); // Bắt lỗi để log đỡ đỏ khi chưa bật Flask-->
+<!--        }-->
+
+<!--        // Cập nhật dữ liệu mỗi 200ms-->
+<!--        setInterval(updateData, 200);-->
+
+<!--        // Xử lý nút Xóa-->
+<!--        document.querySelector('.btn-danger').onclick = function() {-->
+<!--            fetch('/clear_data');-->
+<!--        };-->
+<!--    </script>-->
+<!--</body>-->
+<!--</html>-->
