@@ -39,7 +39,7 @@
             });
 
         // Liên tục chụp ảnh và gửi lên máy chủ
-        const FPS = 10; // Đặt 10 hình/giây để máy chủ Free không bị quá tải
+        const FPS = 1; // Đặt 10 hình/giây để máy chủ Free không bị quá tải
         setInterval(() => {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 canvas.width = video.videoWidth;
