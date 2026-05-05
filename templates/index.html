@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Nhận diện Ngôn ngữ Ký hiệu</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f0f2f5; margin: 0; padding: 20px;}
+        h1 { color: #1a73e8; }
+        .container { display: flex; flex-direction: column; align-items: center; }
+        .video-box { padding: 10px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        #canvas { border-radius: 8px; max-width: 100%; } /* Canvas hiển thị video AI */
+        .result-box { background: white; width: 640px; max-width: 90%; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .text-output { font-size: 28px; font-weight: bold; color: #333; min-height: 40px; margin-top: 10px; border: 2px dashed #ccc; padding: 10px;}
+        button { background-color: #ff4757; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: 0.3s; }
+        button:hover { background-color: #ff6b81; }
+    </style>
+</head>
+<body>
+
+    <h1>🧠 Web AI Dịch Ngôn ngữ Ký hiệu</h1>
+
+    <div class="container">
+        <div class="video-box">
+            <!-- Video ẩn dùng để mượn quyền Camera -->
+            <video id="video" width="640" height="480" autoplay playsinline style="display:none;"></video>
+
+            <!-- Đây là màn hình hiển thị ảnh AI trả về -->
+            <canvas id="canvas" width="640" height="480"></canvas>
+        </div>
+
+        <div class="result-box">
+            <h3>Ký tự hiện tại: <span id="current_char" style="color: #1a73e8;">-</span></h3>
+            <div class="text-output" id="output_text"></div>
+            <button onclick="clearText()">🗑️ Xóa dòng chữ</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const outputText = document.getElementById('output_text');
+        const currentChar = document.getElementById('current_char');
+
+        // 1. Mở camera của trình duyệt
+        navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { alert("Vui lòng cấp quyền mở Camera để hệ thống hoạt động!"); });
+
+        // 2. Vòng lặp bắn ảnh liên tục lên Python (120ms = Khoảng 8 FPS, đủ mượt cho Web Cloud)
+        setInterval(() => {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Vẽ video lấy được vào bộ nhớ tạm
+                let tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 640;
+                tempCanvas.height = 480;
+                tempCanvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
+
+                // Mã hóa ảnh (Nén 60% để gửi cho lẹ, chống lag đường truyền)
+                let dataURL = tempCanvas.toDataURL('image/jpeg', 0.6);
+
+                // Ném ảnh lên URL '/process_frame' bằng HTTP POST
+                fetch('/process_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: dataURL })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Cập nhật video đã vẽ khung
+                    let img = new Image();
+                    img.onload = function() {
+                        context.clearRect(0, 0, canvas.width, canvas.height);
+                        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    };
+                    img.src = data.result_image;
+
+                    // Cập nhật phần chữ cái dịch được
+                    outputText.innerText = data.translated_text;
+                    currentChar.innerText = data.current_char || "-";
+                })
+                .catch(err => console.error("Đang chờ phản hồi...", err));
+            }
+        }, 120);
+
+        // Hàm xóa chữ khi bấm nút
+        function clearText() {
+            fetch('/clear_data').then(() => {
+                outputText.innerText = "";
+            });
+        }
+    </script>
+</body>
+</html>
+
